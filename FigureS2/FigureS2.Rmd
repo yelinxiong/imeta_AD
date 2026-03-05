@@ -1,0 +1,395 @@
+---
+title: "Figure S2: Extended analyses of cells programs and intercellular signaling"
+author: "Lin-Xiong Ye (445233812@qq.com)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 8)
+```
+
+# Overview
+
+This notebook contains all analyses for **Figure S2** (Supplementary Figure 2).
+
+**Figure panels:**
+- **S2A-B**: Volcano plots for SMC2 and SMC3
+- **S2C-F**: Trajectory analysis details
+- **S2E**: MYH11 and ACTA2 expression
+- **S2F**: CLU and LGALS1 expression
+- **S2G-I**: Endothelial cell analysis
+- **S2J**: CellChat summary statistics
+- **S2K**: Ligand/receptor expression
+- **S2L**: Ligand/receptor expression heatmap
+- **S2M**: SMC2/3 to EC signaling flow
+
+---
+
+# Load Libraries
+
+```{r load-libraries}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(SCP)
+library(tidyverse)
+library(CellChat)
+library(ComplexHeatmap)
+library(circlize)
+library(EnhancedVolcano)
+library(gridExtra)
+
+options(future.globals.maxSize = 14000000 * 1024^2)
+```
+
+---
+
+# Load Data
+
+```{r load-data}
+cat("=== Loading Data ===\n")
+
+# Load preprocessed data
+seurat_obj <- readRDS('../seurat_object.rds')
+result_cellchat <- readRDS('../cellchat_results.rds')
+
+cat("Data loaded successfully!\n")
+```
+
+---
+
+#-------------------------------------------------------------------------------
+# Figure S2A-B: Volcano plots for SMC2 and SMC3
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2A-B: SMC subtype volcano plots ---\n")
+
+smc2 = subset(seurat_obj, subtype %in% c('SMC2'))
+smc3 = subset(seurat_obj, subtype %in% c('SMC3'))
+
+smc2 = RunDEtest(srt = smc2, group.by = "exp",
+                 fc.threshold = 1, only.pos = F)
+de_filter = smc2@tools[["DEtest_custom"]][["AllMarkers_wilcox"]]
+de_top <- de_filter %>% group_by(group1) %>% slice_head(n = 5) 
+
+
+de_filter$threshold <- as.factor(ifelse(de_filter$avg_log2FC >= 1 & de_filter$p_val_adj < 0.05, 
+                                        'Up', ifelse(de_filter$avg_log2FC <= -1 & de_filter$p_val_adj < 0.05,
+                                                     'Down', 'Not')))
+de_filter <- data.frame(de_filter)
+
+top_up_genes <- de_filter %>% filter(threshold == 'Up') %>% arrange(p_val_adj) %>% head(5)
+top_down_genes <- de_filter %>% filter(threshold == 'Down') %>% arrange(p_val_adj) %>% head(5)
+
+top_genes <- bind_rows(top_up_genes, top_down_genes)
+
+library(EnhancedVolcano)
+p_s2a = EnhancedVolcano(de_filter, x = 'avg_log2FC',
+                        y = 'p_val_adj', drawConnectors = F,
+                        lab = de_filter$gene, xlim = c(-3, 3), 
+                        FCcutoff = 0.5, legendPosition = 'None', 
+                        selectLab =  top_genes$gene,
+                        subtitle = NULL, title = paste("SMC2"),
+                        widthConnectors = 0.2,
+                        lengthConnectors = unit(0.0, 'npc'), labSize = 2.0,pointSize = 1)
+
+
+
+ggsave("figures/figureS2/FigS2A_SMC2_volcano.pdf", p_s2a, width = 10, height = 8)
+
+ggsave("figures/figureS2/FigS2B_SMC3_volcano.pdf", p_s2b, width = 10, height = 8)
+cat("Saved: FigS2A-B volcano plots\n")
+
+#-------------------------------------------------------------------------------
+# Figure S2C-F: Trajectory analysis details
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2C-F: Trajectory details ---\n")
+cat("Note: Requires Monocle3 trajectory pre-processing\n")
+cat("Refer to original scripts for detailed trajectory code\n")
+
+#-------------------------------------------------------------------------------
+# Figure S2E: MYH11 and ACTA2 expression across SMC subtypes
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2E: Contractile markers ---\n")
+
+p_s2e <- FeatureStatPlot(smc.mergeTEN,
+                         stat.by = c('MYH11', 'ACTA2'),
+                         group.by = "subtype",
+                         comparisons = FALSE,
+                         plot_type = "violin")
+
+ggsave("figures/figureS2/FigS2E_contractile_markers.pdf", p_s2e, width = 8, height = 4)
+cat("Saved: FigS2E_contractile_markers.pdf\n")
+
+
+#-------------------------------------------------------------------------------
+# Figure S2F: CLU and LGALS1 expression
+#-------------------------------------------------------------------------------
+
+p = DynamicPlot(
+  srt = smc.mergeTEN, lineages = c("Monocle3_Pseudotime"), group.by = "subtype",
+  features = c("CLU", "LGALS1"),
+  compare_lineages = TRUE, compare_features = FALSE
+)
+
+ggsave(file = 'figures/figureS2/genes.pdf',p,width = 6,height = 3)
+
+
+#-------------------------------------------------------------------------------
+# Figure S2G-I: Endothelial cell analysis
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2G-I: Endothelial cell analysis ---\n")
+
+# Subset endothelial cells
+ec <- subset(seurat_obj, subtype %in% c("EC1", "EC2", "EC3"))
+
+# UMAP
+p_s2g <- DimPlot(ec,
+                 reduction = "umap",
+                 group.by = "subtype",
+                 label = TRUE)
+
+ggsave("figures/figureS2/FigS2G_EC_UMAP.pdf", p_s2g, width = 7, height = 6)
+
+# Proportions
+p_s2h <- CellStatPlot(ec,
+                      stat.by = "subtype",
+                      group.by = "exp",
+                      plot_type = "trend",
+                      label = FALSE)
+
+ggsave("figures/figureS2/FigS2H_EC_proportions.pdf", p_s2h, width = 4, height = 4)
+
+# GO enrichment
+ec <- RunEnrichment(
+  srt = ec,
+  group_by = "subtype",
+  db = "GO_BP",
+  species = "Homo_sapiens"
+)
+
+p_s2i <- EnrichmentPlot(
+  srt = ec,
+  group_by = "subtype",
+  db = "GO_BP",
+  plot_type = "comparison"
+)
+
+ggsave("figures/figureS2/FigS2I_EC_GO.pdf", p_s2i, width = 8, height = 7)
+cat("Saved: FigS2G-I EC analysis\n")
+
+#-------------------------------------------------------------------------------
+# Figure S2J: CellChat summary statistics
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2J: CellChat summary ---\n")
+cat("Note: Requires detailed CellChat analysis\n")
+
+#-------------------------------------------------------------------------------
+# Figure S2K: Violin plots of ligand/receptor genes
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2K: Ligand/receptor expression ---\n")
+
+ligand_receptor_genes <- c('SEMA4C', 'JAG1', 'VEGFA', 'APP',
+                           'NOTCH1', 'CD74', 'CDH5', 'FLT1')
+
+p_s2k <- FeatureStatPlot(seurat_obj,
+                         stat.by = ligand_receptor_genes,
+                         legend.position = "top",
+                         legend.direction = "horizontal",
+                         split.by = 'exp',
+                         group.by = "subtype",
+                         bg.by = "subtype",
+                         stack = TRUE,
+                         comparisons = TRUE)
+
+ggsave("figures/figureS2/FigS2K_ligand_receptor.pdf", p_s2k, width = 8, height = 6)
+cat("Saved: FigS2K_ligand_receptor.pdf\n")
+
+#-------------------------------------------------------------------------------
+# Figure S2L: Heatmap of ligand/receptor expression changes (log2FC + P-values)
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2L: Ligand/receptor expression heatmap ---\n")
+
+# Define pathway genes (ligands and receptors)
+pathway_genes <- c("SEMA4C", "PLXNB2",
+                   "VEGFA", "FLT1",
+                   "JAG1", "NOTCH1",
+                   "APP", "CD74",
+                   "CDH5", "ANGPTL1")
+available_genes <- pathway_genes[pathway_genes %in% rownames(seurat_obj)]
+
+# Calculate statistics for each gene and cell type
+expr_data <- FetchData(seurat_obj, vars = c(available_genes, "subtype", "exp"))
+cell_types <- sort(unique(expr_data$subtype))
+
+stats_list <- list()
+
+for (gene in available_genes) {
+  for (ct in cell_types) {
+    ct_data <- expr_data %>% filter(subtype == ct)
+
+    normal_expr <- ct_data %>% filter(exp == "Adjacent normal") %>% pull(!!gene)
+    ad_expr     <- ct_data %>% filter(exp == "Dissection tissue") %>% pull(!!gene)
+
+    # Remove NA
+    normal_expr <- normal_expr[!is.na(normal_expr)]
+    ad_expr     <- ad_expr[!is.na(ad_expr)]
+
+    # Wilcoxon test
+    pval <- NA
+    if (length(normal_expr) > 3 && length(ad_expr) > 3) {
+      pval <- suppressWarnings(wilcox.test(ad_expr, normal_expr)$p.value)
+    }
+
+    mn_norm <- mean(normal_expr, na.rm = TRUE)
+    mn_ad   <- mean(ad_expr, na.rm = TRUE)
+
+    stats_list[[length(stats_list) + 1]] <- data.frame(
+      Gene = gene,
+      CellType = ct,
+      Mean_Normal = mn_norm,
+      Mean_AD = mn_ad,
+      Log2FC = log2((mn_ad + 0.01) / (mn_norm + 0.01)),
+      Pvalue = pval,
+      stringsAsFactors = FALSE
+    )
+  }
+}
+
+stats_table <- bind_rows(stats_list)
+
+# Create matrices for heatmap
+log2fc_matrix <- stats_table %>%
+  select(Gene, CellType, Log2FC) %>%
+  pivot_wider(names_from = CellType, values_from = Log2FC) %>%
+  column_to_rownames("Gene") %>%
+  as.matrix()
+
+pval_matrix <- stats_table %>%
+  select(Gene, CellType, Pvalue) %>%
+  pivot_wider(names_from = CellType, values_from = Pvalue) %>%
+  column_to_rownames("Gene") %>%
+  as.matrix()
+
+# Order columns (remove non-existent cell types)
+col_order <- c("Endothelial cells", "Fibroblasts",
+               "SMC1", "SMC2", "SMC3", "SMC4", "SMC5")
+col_order <- col_order[col_order %in% colnames(log2fc_matrix)]
+
+log2fc_matrix <- log2fc_matrix[available_genes, col_order, drop = FALSE]
+pval_matrix   <- pval_matrix[available_genes, col_order, drop = FALSE]
+
+# Format P-values
+fmt_p <- function(p) {
+  if (is.na(p)) return(NA_character_)
+  if (p < 0.001) return(sprintf("%.1e", p))
+  if (p < 0.01)  return(sprintf("%.3f", p))
+  sprintf("%.2f", p)
+}
+
+# Cell annotation function
+cell_fun_l2fc_p <- function(j, i, x, y, width, height, fill) {
+  l2fc <- log2fc_matrix[i, j]
+  pval <- pval_matrix[i, j]
+
+  if (is.na(l2fc)) return(NULL)
+
+  lab1 <- sprintf("Log2FC=%.2f", l2fc)
+  lab2 <- if (!is.na(pval)) paste0("p=", fmt_p(pval)) else ""
+
+  grid.text(lab1, x, y + unit(1.6, "mm"),
+            gp = gpar(fontsize = 6, col = "black"))
+  if (lab2 != "") {
+    grid.text(lab2, x, y - unit(1.6, "mm"),
+              gp = gpar(fontsize = 6, col = "black"))
+  }
+}
+
+# Create heatmap
+col_fun <- colorRamp2(c(-1.5, 0, 1.5), c("steelblue", "white", "firebrick"))
+
+ht_s2l <- Heatmap(
+  log2fc_matrix,
+  name = "Log2FC",
+  col = col_fun,
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  row_names_side = "left",
+  column_names_rot = 45,
+  cell_fun = cell_fun_l2fc_p,
+  row_title = "Genes (Ligands & Receptors)",
+  column_title = "Log2FC (AD vs Normal)",
+  row_names_gp = gpar(fontface = "italic"),
+  heatmap_legend_param = list(
+    title = "Log2FC\n(AD/Normal)",
+    at = c(-1.5, -0.5, 0, 0.5, 1.5)
+  )
+)
+
+pdf("figures/figureS2/FigS2L_LR_expression_heatmap.pdf", width = 8, height = 5)
+draw(ht_s2l)
+dev.off()
+
+cat("Saved: FigS2L_LR_expression_heatmap.pdf\n")
+
+#-------------------------------------------------------------------------------
+# Figure S2M: Relative information flow from SMC2/SMC3 to EC (AD vs Normal)
+#-------------------------------------------------------------------------------
+cat("\n--- Figure S2M: SMC2/3 to EC signaling flow ---\n")
+
+# Use merged CellChat object
+object.list <- list(Normal = result_cellchat$cellchat_control,
+                    AD = result_cellchat$cellchat_test)
+cellchat <- mergeCellChat(object.list, add.names = names(object.list))
+
+# Get cell types
+cell_types <- levels(cellchat@idents[[1]])
+
+# Create signaling flow comparison for SMC2 and SMC3 to EC
+pdf("figures/figureS2/FigS2M_SMC23_EC_signaling_flow.pdf", width = 12, height = 10)
+
+gg_smc_ec <- list()
+
+for(smc in c("SMC2", "SMC3")) {
+  if(smc %in% cell_types & "Endothelial cells" %in% cell_types) {
+    gg_smc_ec[[smc]] <- tryCatch({
+      rankNet(cellchat,
+              mode = "comparison",
+              measure = "weight",
+              color.use = c('steelblue', 'firebrick'),
+              sources.use = smc,
+              targets.use = "Endothelial cells",
+              stacked = TRUE,
+              do.stat = TRUE,
+              title = paste(smc, "→ Endothelial cells\n(Normal vs AD)"))
+    }, error = function(e) {
+      message(paste("Error for", smc, ":", e$message))
+      NULL
+    })
+  }
+}
+
+# Remove NULL entries
+gg_smc_ec <- gg_smc_ec[!sapply(gg_smc_ec, is.null)]
+
+if(length(gg_smc_ec) > 0) {
+  grid.arrange(grobs = gg_smc_ec, ncol = 2)
+}
+
+dev.off()
+
+cat("Saved: FigS2M_SMC23_EC_signaling_flow.pdf\n")
+
+cat("\n=== FIGURE S2 COMPLETE ===\n")
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```

@@ -1,0 +1,526 @@
+---
+title: "Figure 2: Identification and characterization of smooth muscle cell subpopulations in Aortic Dissection"
+author: "Lin-Xiong Ye (445233812@qq.com)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 8)
+```
+
+# Overview
+
+This notebook contains all analyses for **Figure 2**, which characterizes smooth muscle cell (SMC) subpopulations and their cell-cell communication patterns.
+
+**Figure panels:**
+- **2A**: Cell type distribution (AD vs Adjacent)
+- **2B**: SMC subtype proportions
+- **2C**: Hallmark pathway enrichment
+- **2D**: C2 pathway comparison
+- **2E**: Pseudotime trajectory heatmap
+- **2F**: Cell-cell communication heatmap
+- **2G**: SMC2/SMC3 signaling to endothelial cells
+- **2H**: Information flow comparison
+
+---
+
+# Load Libraries
+
+```{r load-libraries}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(SCP)
+library(tidyverse)
+library(CellChat)
+library(ComplexHeatmap)
+library(circlize)
+library(patchwork)
+library(monocle3)
+
+options(future.globals.maxSize = 14000000 * 1024^2)
+```
+
+---
+
+# Load Data
+
+```{r load-data}
+cat("=== Loading Data ===\n")
+
+# Load preprocessed data
+# Note: Update these paths to match your data location
+seurat_obj <- readRDS('../seurat_object.rds')
+result_cellchat <- readRDS('../cellchat_results.rds')
+
+cat("Data loaded successfully!\n")
+```
+
+---
+
+
+#-------------------------------------------------------------------------------
+# Figure 2A: Cell type distribution (AD vs Adjacent)
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2A: Cell type distribution ---\n")
+
+p2a <- CellStatPlot(seurat_obj,
+                    stat.by = "subtype",
+                    group.by = "exp",
+                    plot_type = "trend",
+                    label = FALSE)
+
+ggsave("figures/figure2/Fig2A_celltype_distribution.pdf", p2a, width = 4, height = 4)
+cat("Saved: Fig2A_celltype_distribution.pdf\n")
+
+# Export source data for Fig2A
+fig2a_data <- seurat_obj@meta.data %>%
+  group_by(exp, subtype) %>%
+  summarise(Cell_Count = n(), .groups = "drop") %>%
+  group_by(exp) %>%
+  mutate(Percentage = Cell_Count / sum(Cell_Count) * 100)
+write.csv(fig2a_data, "figures/figure2/Fig2A_celltype_distribution.csv", row.names = FALSE)
+cat("Exported: Fig2A source data\n")
+
+#-------------------------------------------------------------------------------
+# Figure 2B: SMC subtype proportions
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2B: SMC subtype proportions ---\n")
+
+smc.mergeTEN = subset(seurat_obj, subtype %in% c('SMC1','SMC2','SMC3', 'SMC4','SMC5'))
+smc.mergeTEN$subtype <- droplevels(smc.mergeTEN$subtype)
+
+p2b <- CellStatPlot(smc.mergeTEN,
+                    stat.by = "subtype",
+                    group.by = "exp",
+                    #plot_type = "trend",
+                    label = FALSE)
+
+ggsave("figures/figure2/Fig2B_SMC_proportions.pdf", p2b, width = 4, height = 4)
+cat("Saved: Fig2B_SMC_proportions.pdf\n")
+
+# Export source data for Fig2B
+fig2b_data <- smc.mergeTEN@meta.data %>%
+  group_by(exp, subtype) %>%
+  summarise(Cell_Count = n(), .groups = "drop") %>%
+  group_by(exp) %>%
+  mutate(Percentage = Cell_Count / sum(Cell_Count) * 100)
+write.csv(fig2b_data, "figures/figure2/Fig2B_SMC_proportions.csv", row.names = FALSE)
+cat("Exported: Fig2B source data\n")
+
+#-------------------------------------------------------------------------------
+# Figure 2C-D: GSEA results (Hallmark and C2 pathways)
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2C-D: Pathway enrichment ---\n")
+
+# Run enrichment analysis for SMC subtypes
+smc.mergeTEN <- RunGSEA(
+  srt = smc.mergeTEN, group.by = "subtype", 
+  db = c("MSigDB_H",'MSigDB_C2'), species = "Homo_sapiens",
+  DE_threshold = "p_val_adj < 0.05"
+)
+
+# Figure 2C: Hallmark pathways
+p2c <- GSEAPlot(srt = smc.mergeTEN, group.by = "subtype",
+                db = c("MSigDB_H"), plot_type = "comparison")
+
+ggsave("figures/figure2/Fig2C_Hallmark_enrichment.pdf", p2c, width = 12, height = 10)
+cat("Saved: Fig2C_Hallmark_enrichment.pdf\n")
+
+# Export source data for Fig2C
+
+# Filter Hallmark pathways and get TOP10 per SMC subtype
+fig2c_data <- smc.mergeTEN@tools[["GSEA_subtype_wilcox"]][["enrichment"]] %>%
+  filter(Database == "MSigDB_H") %>%
+  select(SMC_Subtype = Groups, Pathway_ID = ID, Description, setSize,
+         enrichmentScore, NES, P_value = pvalue, Adjusted_P_value = p.adjust,
+         core_enrichment) %>%
+  group_by(SMC_Subtype) %>%
+  filter(NES > 0) %>%
+  arrange(Adjusted_P_value) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+write.csv(fig2c_data, "figures/figure2/Fig2C_Hallmark_TOP10_per_subtype.csv", row.names = FALSE)
+cat("Exported: Fig2C source data (TOP10 per subtype:", nrow(fig2c_data), "pathways)\n")
+
+
+# Figure 2D: C2 pathways comparison
+p2d <- GSEAPlot(srt = smc.mergeTEN, group.by = "subtype",
+                db = c("MSigDB_C2"), plot_type = "comparison")
+
+ggsave("figures/figure2/Fig2D_pathway_comparison.pdf", p2d, width = 12, height = 8)
+cat("Saved: Fig2D_pathway_comparison.pdf\n")
+
+# Export source data for Fig2D
+
+# Filter C2 pathways and get TOP10 per SMC subtype
+fig2d_data <- smc.mergeTEN@tools[["GSEA_subtype_wilcox"]][["enrichment"]] %>%
+  filter(Database == "MSigDB_C2" & p.adjust < 0.05) %>%
+  select(SMC_Subtype = Groups, Pathway_ID = ID, Description, setSize,
+         enrichmentScore, NES, P_value = pvalue, Adjusted_P_value = p.adjust,
+         core_enrichment) %>%
+  group_by(SMC_Subtype) %>%
+  filter(NES > 0) %>%
+  arrange(Adjusted_P_value) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+write.csv(fig2d_data, "figures/figure2/Fig2D_C2_TOP10_per_subtype.csv", row.names = FALSE)
+cat("Exported: Fig2D source data (TOP10 per subtype:", nrow(fig2d_data), "pathways)\n")
+
+
+#-------------------------------------------------------------------------------
+# Figure 2E: Pseudotime trajectory heatmap
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2E: Trajectory heatmap ---\n")
+
+# Subsample cells for trajectory analysis (to reduce computation)
+set.seed(123)
+Idents(smc.mergeTEN) <- 'subtype'
+cell_list <- Idents(smc.mergeTEN)
+
+# Sample 1/5 of cells from each subtype
+selectedCells <- sapply(split(Cells(smc.mergeTEN), cell_list), function(cells) {
+  sample(cells, size = floor(length(cells) / 5))
+})
+selectedCells <- unlist(selectedCells)
+
+# Create subsampled object
+smc_sub <- subset(smc.mergeTEN, cells = selectedCells)
+
+# Run Monocle3 trajectory analysis
+smc_sub <- RunMonocle3(srt = smc_sub, clusters = "subtype")
+
+# Extract trajectory components
+trajectory <- smc_sub@tools$Monocle3$trajectory
+milestones <- smc_sub@tools$Monocle3$milestones
+
+# Visualize trajectory
+p2e_trajectory <- CellDimPlot(smc_sub,
+                              group.by = "Monocle3_partitions",
+                              reduction = "UMAP",
+                              label = TRUE,
+                              theme_use = "theme_blank") +
+  trajectory + milestones
+
+# Pseudotime plot (this is actually Figure S2D)
+p_s2d_pseudotime <- FeatureDimPlot(smc_sub,
+                                   features = "Monocle3_Pseudotime",
+                                   reduction = "UMAP",
+                                   theme_use = "theme_blank") +
+  trajectory
+
+ggsave("figures/figureS2/FigS2D_pseudotime_UMAP.pdf", p_s2d_pseudotime, width = 5, height = 5)
+
+# Annotate features for dynamic analysis
+smc_sub <- AnnotateFeatures(smc_sub,
+                             species = "Homo_sapiens",
+                             db = c("TF"))
+
+# Run dynamic feature analysis
+smc_sub <- RunDynamicFeatures(srt = smc_sub,
+                               lineages = c("Monocle3_Pseudotime"),
+                               n_candidates = 100)
+
+# Create dynamic heatmap (Figure 2E main panel)
+Dynamic <- DynamicHeatmap(
+  srt = smc_sub,
+  lineages = c("Monocle3_Pseudotime"),
+  use_fitted = TRUE,
+  n_split = 1,
+  species = "Homo_sapiens",
+  db = c("GO_BP"),
+  anno_terms = TRUE,
+  anno_keys = TRUE,
+  anno_features = TRUE,
+  heatmap_palette = "viridis",
+  cell_annotation = "subtype",
+  separate_annotation = list("subtype"),
+  separate_annotation_palette = c("Paired"),
+  feature_annotation = c("TF"),
+  feature_annotation_palcolor = list(c('red','#ca8687')),
+  pseudotime_label = 25,
+  pseudotime_label_color = "red",
+  show_row_names = TRUE,
+  row_names_side = "left",
+  min_expcells = 10,
+  r.sq = 0.05,
+  dev.expl = 0.05,
+  padjust = 0.05,
+  height = 8.5,
+  width = 2.5
+)
+
+ggsave("figures/figure2/Fig2E_trajectory_heatmap.pdf",
+       Dynamic$plot,
+       width = 25,
+       height = 15)
+
+cat("Saved: Fig2E trajectory analysis\n")
+
+# Export source data for Fig2E
+# Cell pseudotime information
+fig2e_pseudotime <- data.frame(
+  Pseudotime = smc_sub$Monocle3_Pseudotime,
+  SMC_Subtype = smc_sub$subtype
+)
+write.csv(fig2e_pseudotime, "figures/figure2/Fig2E_cell_pseudotime.csv", row.names = FALSE)
+
+
+#-------------------------------------------------------------------------------
+# Figure 2F: Cell-cell communication heatmap (interactions_heatmap)
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2F: Communication heatmap ---\n")
+
+# Merge CellChat objects (control first, test second)
+object.list <- list(Normal = result_cellchat$cellchat_control,
+                    AD = result_cellchat$cellchat_test)
+cellchat <- mergeCellChat(object.list, add.names = names(object.list))
+
+cat("Merged CellChat object created\n")
+
+# Create interaction heatmaps
+gg1 <- netVisual_heatmap(cellchat)
+gg2 <- netVisual_heatmap(cellchat, measure = "weight")
+
+# Save combined heatmap (Figure 2F)
+pdf("figures/figure2/Fig2F_interactions_heatmap.pdf", width = 6, height = 3.7)
+draw(gg1 + gg2, ht_gap = unit(1, "cm"))
+dev.off()
+
+# Export source data for Fig2F
+cellchat_control <- result_cellchat$cellchat_control
+cellchat_test <- result_cellchat$cellchat_test
+
+# Interaction counts (Number of interactions)
+fig2f_count_normal <- as.data.frame(cellchat_control@net$count) %>%
+  tibble::rownames_to_column("Source") %>%
+  pivot_longer(-Source, names_to = "Target", values_to = "Interaction_Count") %>%
+  mutate(Condition = "Normal")
+
+fig2f_count_ad <- as.data.frame(cellchat_test@net$count) %>%
+  tibble::rownames_to_column("Source") %>%
+  pivot_longer(-Source, names_to = "Target", values_to = "Interaction_Count") %>%
+  mutate(Condition = "AD")
+
+fig2f_count_data <- bind_rows(fig2f_count_normal, fig2f_count_ad)
+write.csv(fig2f_count_data, "figures/figure2/Fig2F_interaction_counts.csv", row.names = FALSE)
+
+# Interaction weights (Strength of interactions)
+fig2f_weight_normal <- as.data.frame(cellchat_control@net$weight) %>%
+  tibble::rownames_to_column("Source") %>%
+  pivot_longer(-Source, names_to = "Target", values_to = "Interaction_Weight") %>%
+  mutate(Condition = "Normal")
+
+fig2f_weight_ad <- as.data.frame(cellchat_test@net$weight) %>%
+  tibble::rownames_to_column("Source") %>%
+  pivot_longer(-Source, names_to = "Target", values_to = "Interaction_Weight") %>%
+  mutate(Condition = "AD")
+
+fig2f_weight_data <- bind_rows(fig2f_weight_normal, fig2f_weight_ad)
+write.csv(fig2f_weight_data, "figures/figure2/Fig2F_interaction_weights.csv", row.names = FALSE)
+
+cat("Exported: Fig2F source data (counts and weights)\n")
+
+#-------------------------------------------------------------------------------
+# Figure 2G: SMC2/SMC3 signaling to endothelial cells
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2G: SMC to EC signaling ---\n")
+
+
+cellchat_ad <- result_cellchat$cellchat_test
+
+# Bubble plot showing SMC2/SMC3 to EC signaling
+p2g <- netVisual_bubble(cellchat_ad,
+                        sources.use = c(6, 7),  # SMC2 and SMC3
+                        targets.use = 1,         # Endothelial cells
+                        remove.isolate = FALSE)
+
+ggsave("figures/figure2/Fig2G_SMC_EC_signaling.pdf", p2g, width = 3, height = 4)
+
+cat("Saved: Fig2G_SMC_EC_signaling.pdf\n")
+
+# Export source data for Fig2G
+# Extract ligand-receptor pairs from SMC2/SMC3 to EC with probability and p-values
+
+# Extract all pathways
+pathway_names <- dimnames(cellchat_ad@net$prob)[[3]]
+
+# Create a list to store results
+interaction_list <- list()
+
+for (pathway in pathway_names) {
+  # Get probability and p-value matrices for this pathway
+  prob_matrix <- cellchat_ad@net$prob[, , pathway]
+  pval_matrix <- cellchat_ad@net$pval[, , pathway]
+
+  # Extract SMC2 to Endothelial cells interactions
+  if ("SMC2" %in% rownames(prob_matrix) && "Endothelial cells" %in% colnames(prob_matrix)) {
+    smc2_ec_prob <- prob_matrix["SMC2", "Endothelial cells"]
+    smc2_ec_pval <- pval_matrix["SMC2", "Endothelial cells"]
+
+    if (smc2_ec_prob > 0) {
+      interaction_list[[length(interaction_list) + 1]] <- data.frame(
+        Source = "SMC2",
+        Target = "Endothelial cells",
+        Pathway = pathway,
+        Probability = smc2_ec_prob,
+        P_value = smc2_ec_pval
+      )
+    }
+  }
+
+  # Extract SMC3 to Endothelial cells interactions
+  if ("SMC3" %in% rownames(prob_matrix) && "Endothelial cells" %in% colnames(prob_matrix)) {
+    smc3_ec_prob <- prob_matrix["SMC3", "Endothelial cells"]
+    smc3_ec_pval <- pval_matrix["SMC3", "Endothelial cells"]
+
+    if (smc3_ec_prob > 0) {
+      interaction_list[[length(interaction_list) + 1]] <- data.frame(
+        Source = "SMC3",
+        Target = "Endothelial cells",
+        Pathway = pathway,
+        Probability = smc3_ec_prob,
+        P_value = smc3_ec_pval
+      )
+    }
+  }
+}
+
+# Combine all interactions
+if (length(interaction_list) > 0) {
+  fig2g_data <- bind_rows(interaction_list) %>%
+    arrange(desc(Probability))
+
+  write.csv(fig2g_data, "figures/figure2/Fig2G_SMC_EC_signaling.csv", row.names = FALSE)
+  cat("Exported: Fig2G source data (", nrow(fig2g_data), "interactions)\n")
+} else {
+  cat("Warning: No SMC2/SMC3 to EC interactions found\n")
+}
+
+
+
+#-------------------------------------------------------------------------------
+# Figure 2H: information flow comparison
+#-------------------------------------------------------------------------------
+cat("\n--- Figure 2H: VEGFA signaling shift ---\n")
+# Rank net for VEGF signaling comparison
+# This shows the shift in VEGF signaling sources
+p1 <- netVisual_bubble(cellchat, 
+                       sources.use = c(2,3,4,5,6,7,8,9),  targets.use = c(1), 
+                       comparison = c(1, 2), max.dataset = 1, remove.isolate = T,
+                       title.name = paste("Increased signaling in ",
+                                          names(object.list)[1]), angle.x = 45)
+p2 <- netVisual_bubble(cellchat, 
+                       sources.use = c(2,3,4,5,6,7,8,9),  targets.use = c(1), 
+                       comparison = c(1, 2), max.dataset = 2, 
+                       title.name = paste("Increased signaling in ",
+                                          names(object.list)[2]), angle.x = 45, remove.isolate = T)
+p2h <- p1 + p2
+
+ggsave("figures/figure2/Fig2H_information_flow.pdf", p2h, width = 9, height = 4)
+
+cat("Saved: Fig2H_VEGFA_signaling_shift.pdf\n")
+
+# Export source data for Fig2H
+# Extract ALL pathways to Endothelial cells with probability and p-values
+if (!is.null(cellchat_control@net$prob) && !is.null(cellchat_control@net$pval) &&
+    !is.null(cellchat_test@net$prob) && !is.null(cellchat_test@net$pval)) {
+
+  # Get pathway names from both conditions
+  pathway_names_normal <- dimnames(cellchat_control@net$prob)[[3]]
+  pathway_names_ad <- dimnames(cellchat_test@net$prob)[[3]]
+
+  # Get union of all pathways
+  all_pathways <- unique(c(pathway_names_normal, pathway_names_ad))
+
+  # Create lists to store results
+  interaction_list_normal <- list()
+  interaction_list_ad <- list()
+
+  for (pathway in all_pathways) {
+    # Normal condition - check if pathway exists
+    if (pathway %in% pathway_names_normal) {
+      prob_matrix_normal <- cellchat_control@net$prob[, , pathway]
+      pval_matrix_normal <- cellchat_control@net$pval[, , pathway]
+
+      # Extract all cell types to Endothelial cells (Normal)
+      if ("Endothelial cells" %in% colnames(prob_matrix_normal)) {
+        for (source_cell in rownames(prob_matrix_normal)) {
+          prob_val <- prob_matrix_normal[source_cell, "Endothelial cells"]
+          pval_val <- pval_matrix_normal[source_cell, "Endothelial cells"]
+
+          if (prob_val > 0) {
+            interaction_list_normal[[length(interaction_list_normal) + 1]] <- data.frame(
+              Source = source_cell,
+              Target = "Endothelial cells",
+              Pathway = pathway,
+              Probability = prob_val,
+              P_value = pval_val,
+              Condition = "Normal"
+            )
+          }
+        }
+      }
+    }
+
+    # AD condition - check if pathway exists
+    if (pathway %in% pathway_names_ad) {
+      prob_matrix_ad <- cellchat_test@net$prob[, , pathway]
+      pval_matrix_ad <- cellchat_test@net$pval[, , pathway]
+
+      # Extract all cell types to Endothelial cells (AD)
+      if ("Endothelial cells" %in% colnames(prob_matrix_ad)) {
+        for (source_cell in rownames(prob_matrix_ad)) {
+          prob_val <- prob_matrix_ad[source_cell, "Endothelial cells"]
+          pval_val <- pval_matrix_ad[source_cell, "Endothelial cells"]
+
+          if (prob_val > 0) {
+            interaction_list_ad[[length(interaction_list_ad) + 1]] <- data.frame(
+              Source = source_cell,
+              Target = "Endothelial cells",
+              Pathway = pathway,
+              Probability = prob_val,
+              P_value = pval_val,
+              Condition = "AD"
+            )
+          }
+        }
+      }
+    }
+  }
+
+  # Combine both conditions
+  if (length(interaction_list_normal) > 0 || length(interaction_list_ad) > 0) {
+    fig2h_data <- bind_rows(
+      if (length(interaction_list_normal) > 0) bind_rows(interaction_list_normal) else NULL,
+      if (length(interaction_list_ad) > 0) bind_rows(interaction_list_ad) else NULL
+    ) %>%
+      arrange(Condition, desc(Probability))
+
+    write.csv(fig2h_data, "figures/figure2/Fig2H_all_pathways_to_EC.csv", row.names = FALSE)
+    cat("Exported: Fig2H source data (", nrow(fig2h_data), "interactions across all pathways)\n")
+  } else {
+    cat("Warning: No interactions to Endothelial cells found\n")
+  }
+} else {
+  cat("Warning: Fig2H probability or p-value data not available\n")
+}
+
+
+
+#===============================================================================
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```

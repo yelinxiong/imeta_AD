@@ -1,0 +1,15 @@
+"Presence_of_Thrombus","celltype","Cell_Count","Percentage"
+"No","Classical Monocytes",1576,16.6192133291153
+"No","M1 Macrophages",1883,19.8565854687335
+"No","M2 Macrophages",1202,12.6753137192871
+"No","Mast cells",5,0.0527259306126753
+"No","Megakaryocyte",31,0.326900769798587
+"No","Neutrophils",3118,32.8798903300643
+"No","Platelets",1668,17.5893704523885
+"Yes","Classical Monocytes",37,0.832583258325833
+"Yes","M1 Macrophages",536,12.0612061206121
+"Yes","M2 Macrophages",2308,51.9351935193519
+"Yes","Mast cells",605,13.6138613861386
+"Yes","Megakaryocyte",83,1.86768676867687
+"Yes","Neutrophils",54,1.21512151215122
+"Yes","Platelets",821,18.4743474347435

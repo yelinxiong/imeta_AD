@@ -1,0 +1,15 @@
+"exp","celltype","Cell_Count","Percentage"
+"Adjacent normal","Classical Monocytes",181,14.3879173290938
+"Adjacent normal","M1 Macrophages",622,49.4435612082671
+"Adjacent normal","M2 Macrophages",197,15.6597774244833
+"Adjacent normal","Mast cells",13,1.03338632750397
+"Adjacent normal","Megakaryocyte",2,0.158982511923688
+"Adjacent normal","Neutrophils",20,1.58982511923688
+"Adjacent normal","Platelets",223,17.7265500794913
+"Dissection tissue","Classical Monocytes",1613,11.5818194873268
+"Dissection tissue","M1 Macrophages",2419,17.369139082358
+"Dissection tissue","M2 Macrophages",3510,25.2028433977167
+"Dissection tissue","Mast cells",610,4.37998133122711
+"Dissection tissue","Megakaryocyte",114,0.818553888130969
+"Dissection tissue","Neutrophils",3172,22.775902922381
+"Dissection tissue","Platelets",2489,17.8717598908595

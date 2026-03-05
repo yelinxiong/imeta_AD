@@ -1,0 +1,9 @@
+"Source","Target","Pathway","Probability","P_value"
+"SMC3","Endothelial cells","VEGFA_VEGFR1",0.0639623411997049,0
+"SMC2","Endothelial cells","JAG1_NOTCH1",0.021035422885752,0
+"SMC3","Endothelial cells","ADM_CALCRL",0.0122698337433758,0
+"SMC2","Endothelial cells","CD99_CD99",0.0109026628839311,0
+"SMC2","Endothelial cells","VEGFA_VEGFR1",0.0078661878986158,0
+"SMC2","Endothelial cells","APP_CD74",0.00635924032328002,0
+"SMC2","Endothelial cells","SEMA4C_PLXNB2",0.0060354673068081,0
+"SMC2","Endothelial cells","VEGFB_VEGFR1",0.00377697891596522,0

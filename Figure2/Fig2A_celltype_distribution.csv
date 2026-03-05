@@ -1,0 +1,19 @@
+"exp","subtype","Cell_Count","Percentage"
+"Adjacent normal","Endothelial cells",978,3.35195530726257
+"Adjacent normal","Fibroblasts",150,0.514103574733523
+"Adjacent normal","Lymphatic cells",442,1.51489186688145
+"Adjacent normal","Myeloid cells",1258,4.31161531343181
+"Adjacent normal","SMC1",21260,72.8656133255647
+"Adjacent normal","SMC2",1737,5.9533193954142
+"Adjacent normal","SMC3",698,2.39229530109333
+"Adjacent normal","SMC4",926,3.17373273468828
+"Adjacent normal","SMC5",1728,5.92247318093018
+"Dissection tissue","Endothelial cells",1955,1.67835649837315
+"Dissection tissue","Fibroblasts",806,0.691946464290927
+"Dissection tissue","Lymphatic cells",2132,1.83031000231793
+"Dissection tissue","Myeloid cells",13927,11.9562511267739
+"Dissection tissue","SMC1",62287,53.4730389842295
+"Dissection tissue","SMC2",11092,9.52241958053965
+"Dissection tissue","SMC3",6700,5.7519122962149
+"Dissection tissue","SMC4",12427,10.6685095679198
+"Dissection tissue","SMC5",5157,4.42725547934033

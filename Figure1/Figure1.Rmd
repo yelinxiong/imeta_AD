@@ -1,0 +1,451 @@
+---
+title: "Figure 1: Single-cell RNA sequencing reveals cellular heterogeneity in thrombus-related Aortic Dissection"
+author: "Lin-Xiong Ye (445233812@qq.com)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 8)
+```
+
+# Overview
+
+This notebook contains all analyses for **Figure 1**, which demonstrates cellular heterogeneity in thrombus-related aortic dissection using single-cell RNA sequencing.
+
+**Figure panels:**
+- **1A**: UMAP visualization of all cell types
+- **1B**: Top marker genes heatmap
+- **1C**: Cell composition by thrombus status
+- **1D**: Volcano plot of DEGs
+- **1E**: GSEA analysis
+- **1F**: ANGPTL4 expression
+- **1G**: Myeloid UMAP
+- **1H**: Myeloid proportions
+
+---
+
+# Load Libraries
+
+```{r load-libraries}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(harmony)
+library(SCP)
+library(tidyverse)
+library(ggpubr)
+library(patchwork)
+library(EnhancedVolcano)
+library(rstatix)
+
+# Set options
+options(future.globals.maxSize = 14000000 * 1024^2)
+```
+
+---
+
+# Load Data
+
+```{r load-data}
+cat("=== Loading Data ===\n")
+
+# Load preprocessed data
+# Note: Replace these file paths with your actual data file locations
+seurat_obj <- readRDS('../seurat_object.rds')
+myeloid_obj <- readRDS('../myeloid_subset.rds')
+
+cat("Data loaded successfully!\n")
+cat("Total cells:", ncol(seurat_obj), "\n")
+cat("Cell types:\n")
+print(table(seurat_obj$subtype))
+```
+
+---
+
+# Figure 1A: UMAP of All Cell Types
+
+```{r fig1a-umap}
+cat("\n--- Figure 1A: UMAP by cell types ---\n")
+
+p1a <- CellDimPlot(seurat_obj,
+                   reduction = "umap",
+                   group.by = "subtype",
+                   label = TRUE,
+                   raster = TRUE,
+                   label.size = 3,
+                   pt.size = 0.1) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+ggsave("Fig1A_UMAP_celltypes.pdf", p1a, width = 8, height = 7)
+cat("Saved: Fig1A_UMAP_celltypes.pdf\n")
+
+# Export source data
+fig1a_data <- data.frame(
+  UMAP_1 = seurat_obj@reductions$umap@cell.embeddings[, 1],
+  UMAP_2 = seurat_obj@reductions$umap@cell.embeddings[, 2],
+  Cell_Type = seurat_obj$subtype
+)
+write.csv(fig1a_data, "Fig1A_UMAP_coordinates.csv", row.names = FALSE)
+cat("Exported: Fig1A source data (", nrow(fig1a_data), "cells)\n")
+
+print(p1a)
+```
+
+---
+
+# Figure 1B: Top Marker Genes Heatmap
+
+```{r fig1b-markers}
+cat("\n--- Figure 1B: TOP5 marker genes for each cell type ---\n")
+
+# Run differential expression test
+seurat_obj <- RunDEtest(srt = seurat_obj,
+                          group_by = "subtype",
+                          fc.threshold = 1,
+                          only.pos = TRUE)
+
+# Extract TOP5 markers per cell type
+de_filter <- seurat_obj@tools[["DEtest_subtype"]][["AllMarkers_wilcox"]]
+de_top5 <- de_filter %>%
+  group_by(group1) %>%
+  slice_head(n = 5)
+
+top5_genes <- unique(de_top5$gene)
+
+cat("\nTOP5 markers per cell type:\n")
+print(de_top5[, c("group1", "gene", "avg_log2FC", "p_val_adj")])
+
+# Create heatmap
+p1b <- GroupHeatmap(
+  srt = seurat_obj,
+  features = top5_genes,
+  group.by = "subtype",
+  heatmap_palette = "YlOrRd",
+  cell_annotation_palette = c("Dark2", "Paired"),
+  dot_size = unit(4.8, "mm"),
+  show_row_names = TRUE,
+  show_column_names = TRUE,
+  row_names_side = "left",
+  add_dot = TRUE,
+  add_reticle = TRUE
+)
+
+ggsave("Fig1B_TOP5_markers_heatmap.pdf",
+       p1b$plot,
+       width = 6,
+       height = 6)
+
+cat("Saved: Fig1B_TOP5_markers_heatmap.pdf\n")
+
+# Export source data
+fig1b_data <- de_top5 %>%
+  select(Cell_Type = group1, Gene = gene, avg_log2FC,
+         Pct_in_cluster = pct.1, Pct_out_cluster = pct.2,
+         P_value = p_val, Adjusted_P_value = p_val_adj)
+write.csv(fig1b_data, "Fig1B_TOP5_markers.csv", row.names = FALSE)
+cat("Exported: Fig1B source data (", nrow(fig1b_data), "markers)\n")
+```
+
+---
+
+# Figure 1C: Cell Composition by Thrombus Status
+
+```{r fig1c-composition}
+cat("\n--- Figure 1C: Cell composition by thrombus status (AD samples) ---\n")
+
+# Subset to AD tissue only
+ad_subset <- subset(seurat_obj, exp == 'Dissection tissue')
+
+# Set factor levels
+ad_subset$Presence_of_Thrombus <- factor(ad_subset$Presence_of_Thrombus,
+                                         levels = c("No", "Yes"))
+
+# Create stacked bar plot
+p1c <- CellStatPlot(ad_subset,
+                    stat.by = "subtype",
+                    group.by = "Presence_of_Thrombus",
+                    plot_type = "trend",
+                    label = FALSE)
+
+ggsave("Fig1C_composition_thrombus_AD.pdf", p1c, width = 8, height = 6)
+cat("Saved: Fig1C_composition_thrombus_AD.pdf\n")
+
+# Export source data
+fig1c_data <- ad_subset@meta.data %>%
+  group_by(Presence_of_Thrombus, subtype) %>%
+  summarise(Cell_Count = n(), .groups = "drop") %>%
+  group_by(Presence_of_Thrombus) %>%
+  mutate(Percentage = Cell_Count / sum(Cell_Count) * 100)
+write.csv(fig1c_data, "Fig1C_composition_by_thrombus.csv", row.names = FALSE)
+cat("Exported: Fig1C source data\n")
+
+print(p1c)
+```
+
+---
+
+# Figure 1D: Volcano Plot of DEGs
+
+```{r fig1d-volcano}
+cat("\n--- Figure 1D: Volcano plot (thrombus Yes vs No in AD) ---\n")
+
+# Run differential expression on AD samples
+smc_ad_subset <- subset(ad_subset, subtype %in%
+                          c('SMC1','SMC2','SMC3', 'SMC4','SMC5'))
+smc_ad_subset$subtype <- droplevels(smc_ad_subset$subtype)
+
+markers_smc_ad <- FindMarkers(
+  smc_ad_subset,
+  group.by = "Presence_of_Thrombus",
+  ident.1 = "Yes", ident.2 = "No",
+  test.use = "MAST",
+  latent.vars = c("subtype")
+)
+
+# Select top genes to label
+top_genes <- c("VEGFA","PLOD2","ANGPTL4","SPARC",
+               "ELN","MYH10","ADAM33","MYH11")
+
+p1d <- EnhancedVolcano(markers_smc_ad,
+                       x = 'avg_log2FC',
+                       y = 'p_val_adj',
+                       lab = rownames(markers_smc_ad),
+                       selectLab = top_genes,
+                       xlim = c(-3, 3),
+                       FCcutoff = 0.5,
+                       legendPosition = 'right',
+                       subtitle = NULL,
+                       title = "Thrombus Yes vs No",
+                       labSize = 4.0,
+                       pointSize = 1.5,
+                       drawConnectors = TRUE,
+                       max.overlaps = Inf,
+                       widthConnectors = 0.3)
+
+ggsave("Fig1D_volcano_thrombus.pdf", p1d, width = 8, height = 6)
+cat("Saved: Fig1D_volcano_thrombus.pdf\n")
+
+# Export source data
+fig1d_data <- markers_smc_ad %>%
+  tibble::rownames_to_column("Gene") %>%
+  select(Gene, avg_log2FC, Pct_Thrombus_Yes = pct.1, Pct_Thrombus_No = pct.2,
+         P_value = p_val, Adjusted_P_value = p_val_adj) %>%
+  arrange(Adjusted_P_value)
+write.csv(fig1d_data, "Fig1D_DEG_thrombus_vs_no.csv", row.names = FALSE)
+cat("Exported: Fig1D source data (", nrow(fig1d_data), "genes)\n")
+
+print(p1d)
+```
+
+---
+
+# Figure 1E: GSEA Analysis
+
+```{r fig1e-gsea}
+cat("\n--- Figure 1E: GSEA analysis ---\n")
+
+smc_ad_subset <- RunDEtest(smc_ad_subset,
+                           group.by = "Presence_of_Thrombus",
+                           fc.threshold = 1,
+                           test.use = 'MAST',
+                           only.pos = FALSE)
+
+smc_ad_subset <- RunGSEA(
+  srt = smc_ad_subset,
+  db = "GO_BP",
+  group.by = "Presence_of_Thrombus",
+  species = "Homo_sapiens",
+  DE_threshold = "p_val_adj < 0.05"
+)
+
+p1e <- GSEAPlot(srt = smc_ad_subset, group.by = "Presence_of_Thrombus")
+
+ggsave("Fig1E_GSEA_thrombus.pdf", p1e, width = 14, height = 8)
+cat("Saved: Fig1E_GSEA_thrombus.pdf\n")
+
+# Export source data
+fig1e_data <- smc_ad_subset@tools[["GSEA_Presence_of_Thrombus_wilcox"]][["enrichment"]] %>%
+  select(Group = Groups, Pathway_ID = ID, Description, setSize,
+         enrichmentScore, NES, P_value = pvalue, Adjusted_P_value = p.adjust,
+         core_enrichment) %>%
+  group_by(Group) %>%
+  filter(NES > 0) %>%
+  arrange(Adjusted_P_value) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+write.csv(fig1e_data, "Fig1E_GSEA_TOP10_per_group.csv", row.names = FALSE)
+cat("Exported: Fig1E source data\n")
+
+print(p1e)
+```
+
+---
+
+# Figure 1F: ANGPTL4 Expression
+
+```{r fig1f-expression}
+cat("\n--- Figure 1F: ANGPTL4 expression ---\n")
+
+# Top panel: by thrombus status
+p1f_top <- FeatureStatPlot(ad_subset,
+                           stat.by = c("ANGPTL4"),
+                           group.by = "subtype",
+                           split.by = "Presence_of_Thrombus",
+                           comparisons = TRUE,
+                           stack = TRUE,
+                           plot_type = "violin")
+
+# Bottom panel: by tissue type (AD vs Adjacent)
+p1f_bottom <- FeatureStatPlot(seurat_obj,
+                              stat.by = c("ANGPTL4"),
+                              group.by = "subtype",
+                              split.by = "exp",
+                              comparisons = TRUE,
+                              stack = TRUE,
+                              plot_type = "violin")
+
+# Combine plots
+p1f <- p1f_top / p1f_bottom
+
+ggsave("Fig1F_ANGPTL4_violin.pdf", p1f, width = 12, height = 6)
+cat("Saved: Fig1F_ANGPTL4_violin.pdf\n")
+
+# Export source data with statistics
+# Top panel
+fig1f_top_stats <- ad_subset@meta.data %>%
+  mutate(ANGPTL4 = FetchData(ad_subset, vars = "ANGPTL4")$ANGPTL4) %>%
+  group_by(subtype) %>%
+  wilcox_test(ANGPTL4 ~ Presence_of_Thrombus) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance() %>%
+  select(Cell_Type = subtype, Comparison = .y.,
+         Group1 = group1, Group2 = group2,
+         n1, n2, statistic, P_value = p, Adjusted_P_value = p.adj, Significance = p.adj.signif)
+
+# Bottom panel
+fig1f_bottom_stats <- seurat_obj@meta.data %>%
+  mutate(ANGPTL4 = FetchData(seurat_obj, vars = "ANGPTL4")$ANGPTL4) %>%
+  group_by(subtype) %>%
+  wilcox_test(ANGPTL4 ~ exp) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance() %>%
+  select(Cell_Type = subtype, Comparison = .y.,
+         Group1 = group1, Group2 = group2,
+         n1, n2, statistic, P_value = p, Adjusted_P_value = p.adj, Significance = p.adj.signif)
+
+# Combine both panels
+fig1f_data <- bind_rows(
+  fig1f_top_stats %>% mutate(Panel = "By_Thrombus_Status"),
+  fig1f_bottom_stats %>% mutate(Panel = "By_Tissue_Type")
+)
+
+write.csv(fig1f_data, "Fig1F_ANGPTL4_statistics.csv", row.names = FALSE)
+cat("Exported: Fig1F source data (", nrow(fig1f_data), "comparisons)\n")
+
+print(p1f)
+```
+
+---
+
+# Figure 1G: Myeloid UMAP
+
+```{r fig1g-myeloid-umap}
+cat("\n--- Figure 1G: Myeloid UMAP ---\n")
+
+myeloid_obj$celltype <- factor(myeloid_obj$celltype,
+                               levels = names(table(myeloid_obj$celltype)))
+
+p1g <- CellDimPlot(myeloid_obj,
+                   reduction = "umap",
+                   group.by = "celltype",
+                   label = TRUE,
+                   pt.size = 0.5)
+
+ggsave("Fig1G_myeloid_UMAP.pdf", p1g, width = 5.5, height = 4.5)
+cat("Saved: Fig1G_myeloid_UMAP.pdf\n")
+
+# Export source data
+fig1g_data <- data.frame(
+  UMAP_1 = myeloid_obj@reductions$umap@cell.embeddings[, 1],
+  UMAP_2 = myeloid_obj@reductions$umap@cell.embeddings[, 2],
+  Myeloid_Subtype = myeloid_obj$celltype
+)
+write.csv(fig1g_data, "Fig1G_myeloid_UMAP.csv", row.names = FALSE)
+cat("Exported: Fig1G source data (", nrow(fig1g_data), "myeloid cells)\n")
+
+print(p1g)
+```
+
+---
+
+# Figure 1H: Myeloid Proportions
+
+```{r fig1h-myeloid-proportions}
+cat("\n--- Figure 1H: Myeloid proportions ---\n")
+
+# Left: by thrombus status
+myeloid_obj_sub <- subset(myeloid_obj, exp == 'Dissection tissue')
+
+p1h_left <- CellStatPlot(myeloid_obj_sub,
+                         stat.by = "celltype",
+                         group.by = "Presence_of_Thrombus",
+                         plot_type = "bar",
+                         label = FALSE)
+
+# Right: by tissue type
+p1h_right <- CellStatPlot(myeloid_obj,
+                          stat.by = "celltype",
+                          group.by = "exp",
+                          plot_type = "bar",
+                          label = FALSE)
+
+# Combine
+p1h <- p1h_left | p1h_right
+
+ggsave("Fig1H_myeloid_proportions.pdf", p1h, width = 8, height = 4)
+cat("Saved: Fig1H_myeloid_proportions.pdf\n")
+
+# Export source data
+# By thrombus status
+fig1h_thrombus <- myeloid_obj_sub@meta.data %>%
+  group_by(Presence_of_Thrombus, celltype) %>%
+  summarise(Cell_Count = n(), .groups = "drop") %>%
+  group_by(Presence_of_Thrombus) %>%
+  mutate(Percentage = Cell_Count / sum(Cell_Count) * 100)
+write.csv(fig1h_thrombus, "Fig1H_myeloid_by_thrombus.csv", row.names = FALSE)
+
+# By tissue type
+fig1h_tissue <- myeloid_obj@meta.data %>%
+  group_by(exp, celltype) %>%
+  summarise(Cell_Count = n(), .groups = "drop") %>%
+  group_by(exp) %>%
+  mutate(Percentage = Cell_Count / sum(Cell_Count) * 100)
+write.csv(fig1h_tissue, "Fig1H_myeloid_by_tissue.csv", row.names = FALSE)
+cat("Exported: Fig1H source data\n")
+
+print(p1h)
+```
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
+
+---
+
+# Summary
+
+All Figure 1 analyses completed successfully!
+
+**Outputs:**
+- 8 PDF figures (Fig1A-H)
+- 10 CSV source data files
