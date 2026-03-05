@@ -1,12 +1,10 @@
 ---
 title: "Figure 1: Single-cell RNA sequencing reveals cellular heterogeneity in thrombus-related Aortic Dissection"
-author: "Lin-Xiong Ye (445233812@qq.com)"
+author: "Code Author: Lin-Xiong Ye (445233812@qq.com)"
 date: "`r Sys.Date()`"
 output:
-  html_document:
+  pdf_document:
     toc: true
-    toc_float: true
-    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -43,8 +41,6 @@ library(patchwork)
 library(EnhancedVolcano)
 library(rstatix)
 
-# Set options
-options(future.globals.maxSize = 14000000 * 1024^2)
 ```
 
 ---

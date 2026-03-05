@@ -1,12 +1,10 @@
 ---
 title: "Figure S2: Extended analyses of cells programs and intercellular signaling"
-author: "Lin-Xiong Ye (445233812@qq.com)"
+author: "Code Author: Lin-Xiong Ye (445233812@qq.com)"
 date: "`r Sys.Date()`"
 output:
-  html_document:
+  pdf_document:
     toc: true
-    toc_float: true
-    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -44,7 +42,6 @@ library(circlize)
 library(EnhancedVolcano)
 library(gridExtra)
 
-options(future.globals.maxSize = 14000000 * 1024^2)
 ```
 
 ---
@@ -96,9 +93,6 @@ p_s2a = EnhancedVolcano(de_filter, x = 'avg_log2FC',
                         subtitle = NULL, title = paste("SMC2"),
                         widthConnectors = 0.2,
                         lengthConnectors = unit(0.0, 'npc'), labSize = 2.0,pointSize = 1)
-
-
-
 ggsave("figures/figureS2/FigS2A_SMC2_volcano.pdf", p_s2a, width = 10, height = 8)
 
 ggsave("figures/figureS2/FigS2B_SMC3_volcano.pdf", p_s2b, width = 10, height = 8)

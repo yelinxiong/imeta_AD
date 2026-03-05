@@ -1,12 +1,10 @@
 ---
 title: "Figure 2: Identification and characterization of smooth muscle cell subpopulations in Aortic Dissection"
-author: "Lin-Xiong Ye (445233812@qq.com)"
+author: "Code Author: Lin-Xiong Ye (445233812@qq.com)"
 date: "`r Sys.Date()`"
 output:
-  html_document:
+  pdf_document:
     toc: true
-    toc_float: true
-    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -43,7 +41,6 @@ library(circlize)
 library(patchwork)
 library(monocle3)
 
-options(future.globals.maxSize = 14000000 * 1024^2)
 ```
 
 ---
@@ -403,9 +400,6 @@ if (length(interaction_list) > 0) {
 } else {
   cat("Warning: No SMC2/SMC3 to EC interactions found\n")
 }
-
-
-
 #-------------------------------------------------------------------------------
 # Figure 2H: information flow comparison
 #-------------------------------------------------------------------------------
@@ -512,9 +506,6 @@ if (!is.null(cellchat_control@net$prob) && !is.null(cellchat_control@net$pval) &
 } else {
   cat("Warning: Fig2H probability or p-value data not available\n")
 }
-
-
-
 #===============================================================================
 
 ---

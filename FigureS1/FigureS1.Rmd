@@ -1,12 +1,10 @@
 ---
 title: "Figure S1: Supplementary marker, clinical association, and myeloid enrichment analyses"
-author: "Lin-Xiong Ye (445233812@qq.com)"
+author: "Code Author: Lin-Xiong Ye (445233812@qq.com)"
 date: "`r Sys.Date()`"
 output:
-  html_document:
+  pdf_document:
     toc: true
-    toc_float: true
-    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -35,7 +33,6 @@ library(tidyverse)
 library(ggpubr)
 library(patchwork)
 
-options(future.globals.maxSize = 14000000 * 1024^2)
 ```
 
 ---
@@ -200,9 +197,6 @@ ggsave("figures/figureS1/FigS1B_TOP10_clinical.pdf",
        height = 8)
 
 cat("Saved: FigS1B_TOP10_clinical.pdf\n")
-
-
-
 #-------------------------------------------------------------------------------
 # Figure S1C: GO-BP enrichment across myeloid subtypes
 #-------------------------------------------------------------------------------
