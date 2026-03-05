@@ -76,7 +76,7 @@ Each analysis requires the following data files:
 
 ### Data File Locations
 
-The RMD files expect data files to be located in the parent directory (`../`). Update the file paths in each RMD file to match your data location:
+The RMD files expect data files to be located in the parent directory. Update the file paths in each RMD file to match your data location:
 
 ```r
 # Example: Update these paths in each RMD file
@@ -157,11 +157,7 @@ Figure1/
 
 ## Reproducibility
 
-All analyses are fully reproducible using the provided R Markdown notebooks. Each notebook:
-- Loads data from specified paths
-- Performs all analyses for one figure
-- Generates publication-quality figures
-- Exports source data
+All analyses are fully reproducible using the provided R Markdown notebooks.
 
 ## Citation
 
@@ -175,10 +171,6 @@ If you use this code or data, please cite:
   doi={10.xxxx/xxxxxx}
 }
 ```
-
-## License
-
-This project is licensed under the MIT License.
 
 ## Contact
 
