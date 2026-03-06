@@ -6,6 +6,12 @@ This repository contains the complete analysis code for the manuscript:
 
 **"Single-cell transcriptomics reveals cellular heterogeneity and phenotypic transitions of smooth muscle cells in aortic dissection"**
 
+We utilized single-cell RNA sequencing (scRNA-seq) to investigate cellular heterogeneity and signaling networks in aortic dissection (AD) tissues compared to adjacent normal tissues. Our analysis identified five smooth muscle cell (SMC) subtypes, with SMC2 linked to fibrosis and SMC3 associated with inflammation. Thrombus-positive AD samples showed upregulated ANGPTL4 and increased M2 macrophages, indicating an immunosuppressive microenvironment. Cell-cell communication analysis revealed a shift in VEGFA signaling from SMCs to fibroblasts, disrupting vascular homeostasis. These findings highlight SMC phenotypic switching and altered VEGFA signaling as key drivers of AD pathogenesis.
+
+## Graphical Abstract
+
+![Graphical Abstract](images/graphical_abstract.png)
+
 ## Repository Structure
 
 ```
@@ -36,6 +42,8 @@ imeta_scRNA_AD/
 │   └── FigureS1.Rmd                         # Supplementary Figure S1
 ├── FigureS2/
 │   └── FigureS2.Rmd                         # Supplementary Figure S2
+├── images/
+│   └── graphical_abstract.png               # Graphical abstract
 └── README.md                                # This file
 ```
 
