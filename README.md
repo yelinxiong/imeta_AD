@@ -18,7 +18,7 @@ We utilized single-cell RNA sequencing (scRNA-seq) to investigate cellular heter
 imeta_scRNA_AD/
 ├── Figure1/
 │   ├── Figure1.Rmd                          # Figure 1 analysis code
-│   ├── Fig1A_UMAP_coordinates.csv           # Source data
+│   ├── Fig1A_UMAP_coordinates.csv           
 │   ├── Fig1B_TOP5_markers.csv
 │   ├── Fig1C_composition_by_thrombus.csv
 │   ├── Fig1D_DEG_thrombus_vs_no.csv
@@ -29,7 +29,7 @@ imeta_scRNA_AD/
 │   └── Fig1H_myeloid_by_tissue.csv
 ├── Figure2/
 │   ├── Figure2.Rmd                          # Figure 2 analysis code
-│   ├── Fig2A_celltype_distribution.csv      # Source data
+│   ├── Fig2A_celltype_distribution.csv      
 │   ├── Fig2B_SMC_proportions.csv
 │   ├── Fig2C_Hallmark_TOP10_per_subtype.csv
 │   ├── Fig2D_C2_TOP10_per_subtype.csv
