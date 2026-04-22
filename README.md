@@ -176,7 +176,7 @@ If you use this code or data, please cite:
   title={Single-cell transcriptomics reveals cellular heterogeneity and phenotypic transitions of smooth muscle cells in aortic dissection},
   journal={iMeta},
   year={2026},
-  doi={10.xxxx/xxxxxx}
+  doi={http://doi.org/10.1002/imt2.70124}
 }
 ```
 
